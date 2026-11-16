@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>frontend-orchestrator – un skill pour appeler tous les autres</title>
+<meta name="description" content="frontend-orchestrator choisit, ordonne et appelle vos skills UI, accessibilité et Vercel. Un seul point d’entrée, zéro doublon de contenu.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#12171E;        /* fond principal : bleu forge */
+  --steel:#1C232D;      /* surfaces */
+  --line:#34404F;       /* filets */
+  --paper:#ECE8DF;      /* texte */
+  --mute:#A4ADB8;       /* texte secondaire (≥ 7:1 sur --ink) */
+  --verdi:#6FC6B3;      /* vert-de-gris : accent */
+  --verdi-ink:#0C2A25;  /* texte sur accent */
+  --serif:"Newsreader",Georgia,serif;
+  --sans:"Instrument Sans",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  --s1:.5rem;--s2:1rem;--s3:1.5rem;--s4:2.5rem;--s5:4rem;--s6:7rem;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--paper);font:400 1.0625rem/1.55 var(--sans);
+  font-feature-settings:"kern" 1;text-rendering:optimizeLegibility}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{color:var(--verdi)}
+:focus-visible{outline:3px solid var(--verdi);outline-offset:3px;border-radius:2px}
+.skip{position:absolute;left:var(--s2);top:-4rem;background:var(--verdi);color:var(--verdi-ink);padding:.6rem 1rem;z-index:10;font-weight:600}
+.skip:focus{top:var(--s2)}
+.wrap{max-width:72rem;margin:0 auto;padding:0 var(--s3)}
+header.top{display:flex;justify-content:space-between;align-items:center;padding:var(--s3) 0}
+.brand{font-family:var(--serif);font-size:1.35rem;font-weight:600;text-decoration:none;letter-spacing:-.01em}
+nav.top a{margin-left:var(--s3);color:var(--mute);text-decoration:none;font-size:.95rem;padding:.5rem 0;display:inline-block}
+nav.top a:hover{color:var(--paper)}
+
+/* HERO */
+.hero{padding:var(--s5) 0 var(--s6);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:var(--s5);align-items:start}
+h1{font:400 clamp(2.6rem,6vw,4.6rem)/1.04 var(--serif);letter-spacing:-.025em;margin:0 0 var(--s3);hyphens:none;text-wrap:balance}
+.lede{font-size:1.2rem;color:var(--mute);max-width:34rem;margin:0 0 var(--s4)}
+.lede strong{color:var(--paper);font-weight:500}
+.cta{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.btn{display:inline-flex;align-items:center;min-height:48px;padding:0 1.5rem;background:var(--verdi);color:var(--verdi-ink);font-weight:600;text-decoration:none;border-radius:4px;border:0;font:600 1rem var(--sans);cursor:pointer}
+.btn:hover{background:#8ADBC9;color:var(--verdi-ink)}
+.btn.ghost{background:transparent;color:var(--paper);box-shadow:inset 0 0 0 1px var(--line)}
+.btn.ghost:hover{background:var(--steel);color:var(--paper)}
+
+/* LE MOMENT : la chaîne vivante */
+.rig{background:var(--steel);border:1px solid var(--line);border-radius:6px;padding:var(--s3)}
+.rig h2{font:600 .95rem var(--sans);color:var(--mute);margin:0 0 var(--s2)}
+[role=tablist]{display:flex;gap:var(--s1);flex-wrap:wrap;margin-bottom:var(--s3)}
+[role=tab]{min-height:44px;padding:0 1rem;background:transparent;color:var(--mute);border:1px solid var(--line);border-radius:4px;font:500 .95rem var(--mono);cursor:pointer}
+[role=tab]:hover{color:var(--paper);border-color:var(--mute)}
+[role=tab][aria-selected=true]{background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.when{margin:0 0 var(--s2);color:var(--mute);font-size:.98rem;min-height:3em}
+.chain{list-style:none;margin:0;padding:0;position:relative}
+.chain li{display:grid;grid-template-columns:2.1rem 1fr;gap:var(--s2);padding:.7rem 0;align-items:baseline;animation:land .38s cubic-bezier(.2,.7,.2,1) both}
+.chain li:nth-child(2){animation-delay:.05s}.chain li:nth-child(3){animation-delay:.1s}
+.chain li:nth-child(4){animation-delay:.15s}.chain li:nth-child(5){animation-delay:.2s}.chain li:nth-child(6){animation-delay:.25s}
+.chain li+li{border-top:1px solid var(--line)}
+.chain .n{font:500 .85rem var(--mono);color:var(--verdi)}
+.chain code{font:500 1rem var(--mono);color:var(--paper)}
+.chain small{display:block;color:var(--mute);font-size:.9rem;margin-top:.15rem}
+@keyframes land{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+
+/* SECTIONS */
+section{padding:var(--s5) 0;border-top:1px solid var(--line)}
+h2.sec{font:400 clamp(1.9rem,3.6vw,2.7rem)/1.12 var(--serif);letter-spacing:-.02em;margin:0 0 var(--s3);max-width:28ch;hyphens:none;text-wrap:balance}
+.cols{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:var(--s5)}
+.prose{max-width:34rem}
+.prose p{margin:0 0 var(--s2)}
+.prose p:last-child{margin-bottom:0}
+dl.rules{margin:0}
+dl.rules div{padding:var(--s2) 0;border-top:1px solid var(--line)}
+dl.rules dt{font:600 1.05rem var(--serif);margin-bottom:.2rem}
+dl.rules dd{margin:0;color:var(--mute);max-width:36rem}
+
+/* INSTALL */
+.term{background:#0B0F14;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.term header{display:flex;justify-content:space-between;align-items:center;padding:.4rem .4rem .4rem var(--s2);border-bottom:1px solid var(--line);color:var(--mute);font-size:.9rem}
+.term pre{margin:0;padding:var(--s2);overflow-x:auto;font:400 .95rem/1.7 var(--mono);color:var(--paper)}
+.term .c{color:var(--mute)}
+.copy{min-height:44px;padding:0 1rem;background:transparent;color:var(--paper);border:1px solid var(--line);border-radius:4px;font:500 .9rem var(--sans);cursor:pointer}
+.copy:hover{border-color:var(--verdi);color:var(--verdi)}
+footer{padding:var(--s4) 0 var(--s5);color:var(--mute);font-size:.95rem;border-top:1px solid var(--line)}
+footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:var(--s2)}
+
+@media (max-width:52rem){
+  .hero,.cols{grid-template-columns:1fr;gap:var(--s4)}
+  .hero{padding:var(--s4) 0 var(--s5)}
+  nav.top a:not(:last-child){display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .chain li{animation:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Aller au contenu</a>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="#">frontend-orchestrator</a>
+    <nav class="top" aria-label="Principale">
+      <a href="#principe">Principe</a>
+      <a href="#regles">Règles</a>
+      <a href="#installer">Installer</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="hero">
+      <div>
+        <h1>Un seul skill pour appeler tous les autres.</h1>
+        <p class="lede"><strong>frontend-orchestrator</strong> lit votre demande, choisit les bons skills de design, d’accessibilité et de déploiement, puis les enchaîne dans le bon ordre. Rien n’est copié&nbsp;: il ne charge que ce dont la tâche a besoin.</p>
+        <div class="cta">
+          <a class="btn" href="#installer">Installer le skill</a>
+          <a class="btn ghost" href="#principe">Comment il choisit</a>
+        </div>
+      </div>
+
+      <div class="rig">
+        <h2 id="rig-title">Choisissez une tâche, voyez la chaîne</h2>
+        <div role="tablist" aria-labelledby="rig-title">
+          <button role="tab" id="t-build" aria-selected="true" aria-controls="panel" data-m="build">build</button>
+          <button role="tab" id="t-audit" aria-selected="false" aria-controls="panel" tabindex="-1" data-m="audit">audit</button>
+          <button role="tab" id="t-fix" aria-selected="false" aria-controls="panel" tabindex="-1" data-m="fix">fix</button>
+          <button role="tab" id="t-ship" aria-selected="false" aria-controls="panel" tabindex="-1" data-m="ship">ship</button>
+        </div>
+        <div id="panel" role="tabpanel" aria-labelledby="t-build" tabindex="0">
+          <p class="when" id="when"></p>
+          <ol class="chain" id="chain"></ol>
+        </div>
+      </div>
+    </div>
+
+    <section id="principe">
+      <div class="cols">
+        <h2 class="sec">Vingt skills, un seul réflexe à retenir</h2>
+        <div class="prose">
+          <p>Quand plusieurs skills couvrent le même terrain, l’agent hésite ou les charge tous, et vous payez le contexte. L’orchestrateur tranche avant&nbsp;: un skill de direction créative, un ou deux spécialistes, une étape de contrôle.</p>
+          <p>Il connaît les quatre modes d’un projet d’interface&nbsp;: créer, auditer, corriger, livrer. Chacun correspond à une chaîne fixe que vous pouvez lire dans le fichier.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="regles">
+      <h2 class="sec">Quatre règles qui évitent les collisions</h2>
+      <dl class="rules">
+        <div><dt>Une seule direction créative</dt><dd>Un skill qui pose des questions et un skill autonome ne travaillent jamais sur la même page.</dd></div>
+        <div><dt>La typographie passe en dernier</dt><dd>Elle corrige le code déjà généré, au lieu de lutter contre les choix de style.</dd></div>
+        <div><dt>L’accessibilité valide après le code</dt><dd>Un scan automatisé, puis la revue clavier et lecteur d’écran si la page est critique.</dd></div>
+        <div><dt>Rien de sortant sans votre accord</dt><dd>Un déploiement en production demande une confirmation explicite.</dd></div>
+      </dl>
+    </section>
+
+    <section id="installer">
+      <div class="cols">
+        <div class="prose">
+          <h2 class="sec">Installer en une commande</h2>
+          <p>Le skill est un simple dossier. Copiez-le dans votre répertoire de skills, relancez l’agent, et la demande «&nbsp;fais-moi une landing page&nbsp;» déclenche la chaîne.</p>
+        </div>
+        <div class="term">
+          <header><span>Terminal</span><button class="copy" id="copy" type="button">Copier</button></header>
+<pre id="cmd"><span class="c"># 1. l’orchestrateur</span>
+npx skills add QuentinMarical/frontend-orchestrator
+
+<span class="c"># 2. les skills qu’il appelle (Claude Code)</span>
+git clone https://github.com/QuentinMarical/frontend-orchestrator.git
+bash frontend-orchestrator/scripts/install-skills.sh</pre>
+        </div>
+      </div>
+      <p id="live" role="status" aria-live="polite" style="position:absolute;left:-9999px"></p>
+    </section>
+
+    <section id="compat">
+      <h2 class="sec">Compatible avec les agents qui lisent SKILL.md</h2>
+      <div class="cols">
+        <div class="prose">
+          <p>Le skill suit le format ouvert Agent Skills. Les listes ci-contre viennent de sources publiques&nbsp;; elles n’ont pas été testées une à une.</p>
+          <p>Les skills appelés doivent aussi être installés sur l’agent choisi. Les plugins <code>/plugin install</code> ne concernent que Claude Code.</p>
+        </div>
+        <dl class="rules">
+          <div><dt>Claude Code</dt><dd>Référence. Appel des autres skills via l’outil Skill.</dd></div>
+          <div><dt>OpenAI Codex CLI</dt><dd>Dossier <code>.agents/skills/</code>, skills appelés par leur nom simple.</dd></div>
+          <div><dt>Gemini CLI, Cursor, GitHub Copilot, VS Code</dt><dd>Format SKILL.md annoncé comme pris en charge.</dd></div>
+          <div><dt>JetBrains Junie, Amp, Roo Code, Goose, Windsurf, Continue</dt><dd>Cités par des sources tierces.</dd></div>
+        </dl>
+      </div>
+    </section>
+  </main>
+</div>
+<footer><div class="wrap"><span>MIT</span><a href="https://github.com/QuentinMarical/frontend-orchestrator">Code source sur GitHub</a></div></footer>
+
+<script>
+const MODES={
+  build:{when:"Créer une page, un composant ou une application.",steps:[
+    ["frontend-design","direction créative, un seul parti pris"],
+    ["ui-ux-pro-max","palette, typographie, règles d’interface"],
+    ["vercel:nextjs","stack et conventions du framework"],
+    ["ui-typography","guillemets, tirets, longueur de ligne"],
+    ["accessibility-scan","contrôle des violations WCAG 2.2"]]},
+  audit:{when:"Évaluer une interface qui existe déjà.",steps:[
+    ["design-audit","audit visuel, plan par phases"],
+    ["ui-ux-pro-max","revue contre les règles d’interface"],
+    ["accessibility-audit","conformité WCAG de l’ensemble du site"]]},
+  fix:{when:"Corriger l’accessibilité sans régression.",steps:[
+    ["accessibility-scan","liste des violations, avec sélecteurs"],
+    ["accessibility-fix","correction puis nouvelle vérification"],
+    ["accessibility-diff","aucune régression par rapport à la base"]]},
+  ship:{when:"Mettre en ligne, avec votre accord.",steps:[
+    ["vercel:verification","le build et les routes répondent"],
+    ["vercel:deploy","aperçu par défaut, production sur demande"],
+    ["vercel:status","état du déploiement"]]}
+};
+const tabs=[...document.querySelectorAll('[role=tab]')],panel=document.getElementById('panel'),
+      chain=document.getElementById('chain'),when=document.getElementById('when');
+function show(m,focus){
+  tabs.forEach(t=>{const on=t.dataset.m===m;t.setAttribute('aria-selected',on);t.tabIndex=on?0:-1;if(on){panel.setAttribute('aria-labelledby',t.id);if(focus)t.focus()}});
+  const d=MODES[m];when.textContent=d.when;chain.innerHTML="";
+  d.steps.forEach(([n,t],i)=>{const li=document.createElement('li');
+    li.innerHTML='<span class="n">'+(i+1)+'</span><div><code></code><small></small></div>';
+    li.querySelector('code').textContent=n;li.querySelector('small').textContent=t;chain.appendChild(li)});
+}
+tabs.forEach((t,i)=>{
+  t.addEventListener('click',()=>show(t.dataset.m));
+  t.addEventListener('keydown',e=>{
+    const k={ArrowRight:1,ArrowLeft:-1}[e.key];
+    if(k){e.preventDefault();show(tabs[(i+k+tabs.length)%tabs.length].dataset.m,true)}
+    if(e.key==='Home'){e.preventDefault();show(tabs[0].dataset.m,true)}
+    if(e.key==='End'){e.preventDefault();show(tabs[tabs.length-1].dataset.m,true)}
+  });
+});
+show('build');
+document.getElementById('copy').addEventListener('click',async()=>{
+  const txt=document.getElementById('cmd').innerText.split('\n').filter(l=>!l.startsWith('#')).join('\n');
+  const live=document.getElementById('live');
+  try{await navigator.clipboard.writeText(txt);live.textContent='Commandes copiées'}catch(e){live.textContent='Copie impossible, sélectionnez le texte'}
+});
+</script>
+</body>
+</html>
